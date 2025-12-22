@@ -1,52 +1,43 @@
-// src/components/Button.tsx
-import * as Haptics from "expo-haptics";
-import { Text, TouchableOpacity, TouchableOpacityProps } from "react-native";
-import { cn } from "../lib/utils";
+import { cn } from "@/src/lib/utils";
+import { Pressable, Text } from "react-native";
 
-interface ButtonProps extends TouchableOpacityProps {
-  title: string;
-  variant?: "primary" | "secondary";
-}
+type Props = {
+  children: string;
+  onPress: () => void;
+  disabled?: boolean;
+  variant?: "primary" | "secondary" | "danger";
+};
 
 export function Button({
-  title,
-  variant = "primary",
-  className,
+  children,
   onPress,
-  ...props
-}: ButtonProps) {
-  const handlePress = (e: any) => {
-    Haptics.selectionAsync();
-    onPress?.(e);
-  };
+  disabled,
+  variant = "primary",
+}: Props) {
+  const base = "rounded-2xl py-4 items-center justify-center active:opacity-90";
+
+  const variantClass =
+    variant === "primary"
+      ? "bg-accent"
+      : variant === "danger"
+      ? "bg-danger"
+      : "bg-surface";
+
+  const textClass = variant === "secondary" ? "text-primary" : "text-primary";
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={handlePress}
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       className={cn(
-        "w-full py-4 rounded-xl border-2 border-primary flex items-center justify-center mb-4", // Adicionei mb-4
-        variant === "primary" ? "bg-primary" : "bg-white",
-        className
+        base,
+        variantClass,
+        disabled ? "opacity-40" : "opacity-100"
       )}
-      // AQUI ESTÁ A MÁGICA DA SOMBRA HARD (GEN Z) SEGURA:
-      style={{
-        shadowColor: "#111",
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 0, // Radius 0 cria o efeito "duro" sem blur
-        elevation: 5, // Para Android (ficará com leve blur, mas ok)
-      }}
-      {...props}
     >
-      <Text
-        className={cn(
-          "font-bold text-lg font-heading",
-          variant === "primary" ? "text-accent" : "text-primary"
-        )}
-      >
-        {title}
-      </Text>
-    </TouchableOpacity>
+      <Text className={cn("font-bold text-lg", textClass)}>{children}</Text>
+    </Pressable>
   );
 }

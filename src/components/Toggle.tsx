@@ -1,44 +1,36 @@
-// src/components/Toggle.tsx
-import { Pressable, View, Text } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
-import { cn } from "../lib/utils";
+import { cn } from "@/src/lib/utils";
+import { Pressable, Text, View } from "react-native";
 
-interface ToggleProps {
-  value: boolean;
-  onValueChange: (val: boolean) => void;
+type Props = {
   label: string;
-}
+  active: boolean;
+  onPress: () => void;
+};
 
-export function Toggle({ value, onValueChange, label }: ToggleProps) {
-  const handlePress = () => {
-    Haptics.selectionAsync();
-    onValueChange(!value);
-  };
-
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: withTiming(value ? 28 : 0) }], // Move a bolinha
-  }));
-
+export function Toggle({ label, active, onPress }: Props) {
   return (
     <Pressable
-      onPress={handlePress}
-      className="flex-row items-center justify-between mb-6"
+      onPress={onPress}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: active }}
+      className={cn(
+        "rounded-2xl px-4 py-4 flex-row items-center justify-between",
+        active ? "bg-accent" : "bg-background"
+      )}
     >
-      <Text className="font-heading text-xl text-primary">{label}</Text>
+      <Text className="font-bold text-primary">{label}</Text>
 
       <View
         className={cn(
-          "w-14 h-8 rounded-full border-2 border-primary justify-center px-1 transition-colors",
-          value ? "bg-accent" : "bg-gray-200"
+          "h-6 w-10 rounded-full p-1",
+          active ? "bg-primary/20" : "bg-primary/10"
         )}
       >
-        <Animated.View
-          style={thumbStyle}
-          className="w-5 h-5 rounded-full bg-primary border border-primary"
+        <View
+          className={cn(
+            "h-4 w-4 rounded-full bg-primary",
+            active ? "ml-auto" : "mr-auto"
+          )}
         />
       </View>
     </Pressable>

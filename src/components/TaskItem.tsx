@@ -1,73 +1,62 @@
-// src/components/TaskItem.tsx
+import { Checkbox } from "@/src/components/Checkbox";
+import { cn } from "@/src/lib/utils";
+import { Task } from "@/src/store/useTasks";
 import { Ionicons } from "@expo/vector-icons";
-import { Text, TouchableOpacity, View } from "react-native";
-import { cn } from "../lib/utils";
-import { RecurrenceType } from "../store/useTasks";
-import { Checkbox } from "./Checkbox";
+import { Pressable, Text, View } from "react-native";
 
-interface TaskItemProps {
-  label: string;
-  category: string;
-  isCompleted: boolean;
-  recurrence?: RecurrenceType; // Novo prop opcional
+type Props = {
+  task: Task;
+  isFocusMode: boolean;
+  isCurrentFocus: boolean;
   onToggle: () => void;
   onDelete: () => void;
-}
+  onFocus: () => void;
+};
 
 export function TaskItem({
-  label,
-  category,
-  isCompleted,
-  recurrence = "none",
+  task,
+  isFocusMode,
+  isCurrentFocus,
   onToggle,
   onDelete,
-}: TaskItemProps) {
+  onFocus,
+}: Props) {
   return (
-    <View
+    <Pressable
+      onPress={onFocus}
+      disabled={isFocusMode}
+      accessibilityRole="button"
       className={cn(
-        "flex-row items-center p-4 mb-3 border-2 border-primary rounded-xl bg-surface",
-        "shadow-[2px_2px_0px_0px_rgba(17,17,17,1)]"
+        "bg-surface rounded-3xl p-5 mb-4",
+        isCurrentFocus ? "border-2 border-accent" : "border border-transparent"
       )}
     >
-      <Checkbox checked={isCompleted} onPress={onToggle} />
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-4">
+          <Text
+            className={cn(
+              "font-heading text-2xl",
+              task.isCompleted ? "text-muted" : "text-primary"
+            )}
+          >
+            {task.text}
+          </Text>
 
-      <View className="flex-1 mr-2 ml-1">
-        <View className="flex-row items-center mb-1">
-          {/* Tag de Categoria */}
-          <View className="bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200 mr-2">
-            <Text className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              {category}
-            </Text>
-          </View>
-
-          {/* Ícone de Recorrência (Se existir) */}
-          {recurrence !== "none" && (
-            <View className="flex-row items-center">
-              <Ionicons name="sync" size={10} color="#9CA3AF" />
-              <Text className="text-[10px] text-gray-400 font-bold ml-1 uppercase">
-                {recurrence === "daily" ? "Todo dia" : "Seg-Sex"}
-              </Text>
-            </View>
-          )}
+          <Text className="font-body text-muted mt-1">{task.category}</Text>
         </View>
 
-        <Text
-          className={cn(
-            "font-body text-lg text-primary",
-            isCompleted && "line-through text-muted opacity-50"
-          )}
-          numberOfLines={1}
+        <Pressable
+          onPress={onDelete}
+          accessibilityRole="button"
+          className="h-10 w-10 items-center justify-center rounded-2xl bg-background"
         >
-          {label}
-        </Text>
+          <Ionicons name="trash-outline" size={18} color="#111111" />
+        </Pressable>
       </View>
 
-      <TouchableOpacity
-        onPress={onDelete}
-        className="p-2 opacity-30 active:opacity-100"
-      >
-        <Ionicons name="trash-outline" size={20} color="#FF4D4D" />
-      </TouchableOpacity>
-    </View>
+      <View className="mt-4">
+        <Checkbox checked={task.isCompleted} onPress={onToggle} />
+      </View>
+    </Pressable>
   );
 }

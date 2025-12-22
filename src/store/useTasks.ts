@@ -1,10 +1,9 @@
-// src/store/useTasks.ts
 import * as Haptics from "expo-haptics";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { zustandStorage } from "../lib/storage";
+import { zustandStorage } from "@/src/lib/storage";
+import { hapticImpact, hapticNotification } from "@/src/lib/haptics";
 
-// Tipos de recorrência
 export type RecurrenceType = "none" | "daily" | "mon-fri";
 
 export interface Task {
@@ -12,107 +11,123 @@ export interface Task {
   text: string;
   category: string;
   isCompleted: boolean;
-  recurrence: RecurrenceType; // Novo campo
-  lastCompletedDate?: string; // Para saber quando foi feita
+  recurrence: RecurrenceType;
+  lastCompletedDate?: string;
   createdAt: number;
 }
 
-interface TasksState {
+type TasksState = {
   tasks: Task[];
   categories: string[];
   addTask: (text: string, category: string, recurrence: RecurrenceType) => void;
-  toggleTask: (id: string) => void;
-  removeTask: (id: string) => void;
+  toggleTask: (taskId: string) => void;
+  removeTask: (taskId: string) => void;
   clearAllTasks: () => void;
-  checkDailyReset: () => void; // A função que roda ao abrir o app
+  checkDailyReset: () => void;
+};
+
+const DEFAULT_CATEGORY = "Geral";
+
+function createId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function toLocalDateKey(date = new Date()) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeCategory(input: string) {
+  const value = input.trim();
+  return value.length > 0 ? value : DEFAULT_CATEGORY;
 }
 
 export const useTasks = create<TasksState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       tasks: [],
-      categories: ["Geral"],
+      categories: [DEFAULT_CATEGORY],
 
-      addTask: (text: string, category: string, recurrence: RecurrenceType) => {
+      addTask: (text, category, recurrence) => {
+        const finalText = text.trim();
+        if (!finalText) return;
+
+        const finalCategory = normalizeCategory(category);
+
         set((state) => {
-          const newCategories = state.categories.includes(category)
+          const nextCategories = state.categories.includes(finalCategory)
             ? state.categories
-            : [...state.categories, category];
+            : [...state.categories, finalCategory];
+
+          const task: Task = {
+            id: createId(),
+            text: finalText,
+            category: finalCategory,
+            recurrence,
+            isCompleted: false,
+            createdAt: Date.now(),
+          };
 
           return {
-            categories: newCategories,
-            tasks: [
-              {
-                id: Date.now().toString(),
-                text,
-                category,
-                recurrence, // Salvando a frequencia
-                isCompleted: false,
-                createdAt: Date.now(),
-              },
-              ...state.tasks,
-            ],
+            tasks: [task, ...state.tasks],
+            categories: nextCategories,
           };
         });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        void hapticImpact(Haptics.ImpactFeedbackStyle.Light);
       },
 
-      toggleTask: (id: string) => {
+      toggleTask: (taskId) => {
+        const today = toLocalDateKey();
+
         set((state) => ({
           tasks: state.tasks.map((task) => {
-            if (task.id === id) {
-              const isNowCompleted = !task.isCompleted;
-              return {
-                ...task,
-                isCompleted: isNowCompleted,
-                // Salva a data de hoje se completou
-                lastCompletedDate: isNowCompleted
-                  ? new Date().toDateString()
-                  : undefined,
-              };
+            if (task.id !== taskId) return task;
+
+            const nextCompleted = !task.isCompleted;
+
+            if (nextCompleted) {
+              void hapticImpact(Haptics.ImpactFeedbackStyle.Medium);
+              return { ...task, isCompleted: true, lastCompletedDate: today };
             }
-            return task;
+
+            void hapticImpact(Haptics.ImpactFeedbackStyle.Light);
+            return { ...task, isCompleted: false };
           }),
         }));
       },
 
-      removeTask: (id: string) => {
+      removeTask: (taskId) => {
         set((state) => ({
-          tasks: state.tasks.filter((task) => task.id !== id),
+          tasks: state.tasks.filter((t) => t.id !== taskId),
         }));
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        void hapticNotification(Haptics.NotificationFeedbackType.Warning);
       },
 
       clearAllTasks: () => {
         set({ tasks: [] });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        void hapticNotification(Haptics.NotificationFeedbackType.Warning);
       },
 
-      // MÁGICA: Reinicia tarefas recorrentes se virou o dia
       checkDailyReset: () => {
-        const today = new Date().toDateString();
-        const currentDayOfWeek = new Date().getDay(); // 0 = Domingo, 6 = Sábado
-        const isWeekend = currentDayOfWeek === 0 || currentDayOfWeek === 6;
+        const today = toLocalDateKey();
+        const day = new Date().getDay();
+        const isWeekend = day === 0 || day === 6;
 
         set((state) => ({
           tasks: state.tasks.map((task) => {
-            // Se não é recorrente ou não está completa, ignora
             if (task.recurrence === "none" || !task.isCompleted) return task;
-
-            // Se foi completada hoje, mantém completada
             if (task.lastCompletedDate === today) return task;
 
-            // Lógica de reset:
-            let shouldReset = false;
-
             if (task.recurrence === "daily") {
-              shouldReset = true; // Todo dia reseta
-            } else if (task.recurrence === "mon-fri") {
-              shouldReset = !isWeekend; // Só reseta se for dia de semana
+              return { ...task, isCompleted: false };
             }
 
-            if (shouldReset) {
-              return { ...task, isCompleted: false }; // "Ressuscita" a tarefa
+            if (task.recurrence === "mon-fri" && !isWeekend) {
+              return { ...task, isCompleted: false };
             }
 
             return task;
@@ -122,6 +137,7 @@ export const useTasks = create<TasksState>()(
     }),
     {
       name: "tasks-storage",
+      version: 1,
       storage: createJSONStorage(() => zustandStorage),
     }
   )

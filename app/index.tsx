@@ -1,24 +1,35 @@
-// app/index.tsx
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react"; // ADICIONEI useEffect
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { AddTaskModal } from "../src/components/AddTaskModal";
-import { Button } from "../src/components/Button";
-import { FocusCard } from "../src/components/FocusCard";
-import { TaskItem } from "../src/components/TaskItem";
-import { Toggle } from "../src/components/Toggle";
-import { cn } from "../src/lib/utils";
-import { useTasks } from "../src/store/useTasks";
+import { useEffect, useMemo, useCallback, useState } from "react";
+import {
+  Alert,
+  AppState,
+  FlatList,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { AddTaskModal } from "@/src/components/AddTaskModal";
+import { Button } from "@/src/components/Button";
+import { FocusCard } from "@/src/components/FocusCard";
+import { TaskItem } from "@/src/components/TaskItem";
+import { cn } from "@/src/lib/utils";
+import { useTasks } from "@/src/store/useTasks";
 
-export default function Home() {
-  const [isModalVisible, setModalVisible] = useState(false);
+type TaskId = string;
+
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState("Todos");
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<string>("Todos");
+  const [focusTaskId, setFocusTaskId] = useState<TaskId | null>(null);
 
-  // Adicione checkDailyReset aqui na desestruturação
   const {
     tasks,
     categories,
@@ -29,170 +40,197 @@ export default function Home() {
     checkDailyReset,
   } = useTasks();
 
-  // EFEITO MÁGICO: Roda ao montar a tela
   useEffect(() => {
     checkDailyReset();
-  }, []);
+  }, [checkDailyReset]);
 
-  const dynamicFilters = ["Todos", ...categories];
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") checkDailyReset();
+    });
 
-  const pendingTasks = tasks.filter((t) => !t.isCompleted);
+    return () => sub.remove();
+  }, [checkDailyReset]);
 
-  const visibleTasks = tasks.filter((t) => {
-    if (selectedFilter === "Todos") return true;
-    return t.category === selectedFilter;
-  });
+  const filters = useMemo(() => ["Todos", ...categories], [categories]);
+
+  const pendingTasks = useMemo(
+    () => tasks.filter((t) => !t.isCompleted),
+    [tasks]
+  );
+
+  const visibleTasks = useMemo(() => {
+    if (selectedFilter === "Todos") return tasks;
+    return tasks.filter((t) => t.category === selectedFilter);
+  }, [tasks, selectedFilter]);
+
+  const tasksForFocus = useMemo(() => {
+    if (selectedFilter === "Todos") return pendingTasks;
+    return pendingTasks.filter((t) => t.category === selectedFilter);
+  }, [pendingTasks, selectedFilter]);
+
+  const currentFocusTask = useMemo(() => {
+    if (tasksForFocus.length === 0) return null;
+    if (!focusTaskId) return tasksForFocus[0];
+    return tasksForFocus.find((t) => t.id === focusTaskId) ?? tasksForFocus[0];
+  }, [tasksForFocus, focusTaskId]);
+
+  useEffect(() => {
+    if (!isFocusMode) return;
+    if (tasksForFocus.length === 0) {
+      setFocusTaskId(null);
+      setIsFocusMode(false);
+      return;
+    }
+
+    if (focusTaskId && tasksForFocus.some((t) => t.id === focusTaskId)) return;
+    setFocusTaskId(tasksForFocus[0].id);
+  }, [isFocusMode, tasksForFocus, focusTaskId]);
 
   const activeTasksCount = pendingTasks.length;
 
-  const tasksForFocus =
-    selectedFilter === "Todos"
-      ? pendingTasks
-      : pendingTasks.filter((t) => t.category === selectedFilter);
-
-  const currentFocusTask = tasksForFocus[0];
-
-  const handleFilterChange = (filter: string) => {
-    Haptics.selectionAsync();
+  const handleFilterChange = useCallback((filter: string) => {
     setSelectedFilter(filter);
-  };
+    setFocusTaskId(null);
+  }, []);
 
-  const handleClearAll = () => {
-    Alert.alert("Apagar Tudo?", "Isso vai excluir todas as tarefas.", [
+  const handleClearAll = useCallback(() => {
+    Alert.alert("Apagar tudo?", "Isso vai excluir todas as tarefas.", [
       { text: "Cancelar", style: "cancel" },
-      { text: "Apagar", style: "destructive", onPress: () => clearAllTasks() },
+      {
+        text: "Apagar",
+        style: "destructive",
+        onPress: () => {
+          setFocusTaskId(null);
+          setIsFocusMode(false);
+          clearAllTasks();
+        },
+      },
     ]);
-  };
+  }, [clearAllTasks]);
+
+  const handleSkipFocus = useCallback(() => {
+    if (!currentFocusTask) return;
+    if (tasksForFocus.length <= 1) return;
+
+    const currentIndex = tasksForFocus.findIndex(
+      (t) => t.id === currentFocusTask.id
+    );
+    const nextIndex = (currentIndex + 1) % tasksForFocus.length;
+    setFocusTaskId(tasksForFocus[nextIndex].id);
+  }, [tasksForFocus, currentFocusTask]);
+
+  const headerSubtitle = useMemo(() => {
+    if (activeTasksCount === 0) return "Tudo limpo por hoje.";
+    if (activeTasksCount === 1) return "1 tarefa pendente";
+    return `${activeTasksCount} tarefas pendentes`;
+  }, [activeTasksCount]);
+
+  const listBottomPadding = Math.max(24, insets.bottom + 96);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <StatusBar style="dark" />
+      <View className="px-6 pt-4 pb-2">
+        <View className="flex-row items-center justify-between">
+          <Text className="font-heading text-5xl text-primary">Hoje</Text>
 
-      <View className="flex-1">
-        <View className="mb-4 mt-4 px-6">
-          <View className="flex-row justify-between items-center">
-            <Text className="font-heading text-5xl text-primary">Hoje</Text>
-            {tasks.length > 0 && (
-              <Pressable
-                onPress={handleClearAll}
-                className="p-2 bg-red-100 rounded-full"
-              >
-                <Ionicons name="trash-bin-outline" size={20} color="#FF4D4D" />
-              </Pressable>
-            )}
-          </View>
-
-          <Text className="font-body text-muted text-lg mb-4">
-            {activeTasksCount}{" "}
-            {activeTasksCount === 1 ? "tarefa pendente" : "tarefas pendentes"}
-          </Text>
-
-          <View className="mb-6">
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 24 }}
+          {tasks.length > 0 && (
+            <Pressable
+              onPress={handleClearAll}
+              accessibilityRole="button"
+              className="h-10 w-10 items-center justify-center rounded-2xl bg-surface"
             >
-              {dynamicFilters.map((filter) => (
-                <Pressable
-                  key={filter}
-                  onPress={() => handleFilterChange(filter)}
-                  className={cn(
-                    "mr-3 px-4 py-2 rounded-full border-2 transition-all",
-                    selectedFilter === filter
-                      ? "bg-primary border-primary"
-                      : "bg-transparent border-gray-300"
-                  )}
-                >
-                  <Text
-                    className={cn(
-                      "font-bold",
-                      selectedFilter === filter
-                        ? "text-accent"
-                        : "text-gray-400"
-                    )}
-                  >
-                    {filter}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-
-          {activeTasksCount > 0 && (
-            <Toggle
-              label="Modo Foco Unico"
-              value={isFocusMode}
-              onValueChange={setIsFocusMode}
-            />
+              <Ionicons name="trash-outline" size={18} color="#111111" />
+            </Pressable>
           )}
         </View>
 
-        {isFocusMode && currentFocusTask ? (
-          <View className="px-6 flex-1">
-            <FocusCard
-              task={currentFocusTask}
-              onComplete={() => toggleTask(currentFocusTask.id)}
-              onSkip={() => alert("Em breve: pular tarefa!")}
-            />
-          </View>
-        ) : (
-          <>
-            <ScrollView
-              className="flex-1"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: 24,
-                paddingBottom: 100,
-              }}
-            >
-              {visibleTasks.length === 0 ? (
-                <View className="mt-20 items-center opacity-50">
-                  <Text className="font-heading text-6xl mb-2">
-                    {selectedFilter === "Todos" ? "🎈" : "🔍"}
-                  </Text>
-                  <Text className="font-body text-lg text-center">
-                    {selectedFilter === "Todos"
-                      ? "Tudo limpo por hoje!"
-                      : `Nenhuma tarefa de ${selectedFilter}.`}
-                  </Text>
-                </View>
-              ) : (
-                visibleTasks.map((task) => (
-                  <TaskItem
-                    key={task.id}
-                    label={task.text}
-                    category={task.category}
-                    recurrence={task.recurrence} // Passando recorrência
-                    isCompleted={task.isCompleted}
-                    onToggle={() => toggleTask(task.id)}
-                    onDelete={() => removeTask(task.id)}
-                  />
-                ))
-              )}
-            </ScrollView>
+        <Text className="font-body text-muted text-lg mb-4">
+          {headerSubtitle}
+        </Text>
 
-            <View className="absolute bottom-4 left-6 right-6">
-              <Button
-                title="Nova Tarefa +"
-                onPress={() => setModalVisible(true)}
-                style={{
-                  shadowColor: "#000",
-                  shadowOffset: { width: 4, height: 4 },
-                  shadowOpacity: 1,
-                  elevation: 5,
-                }}
-              />
-            </View>
-          </>
+        <View className="mb-6">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 24 }}
+          >
+            {filters.map((filter) => (
+              <Pressable
+                key={filter}
+                onPress={() => handleFilterChange(filter)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: selectedFilter === filter }}
+                className={cn(
+                  "mr-3 px-4 py-2 rounded-full",
+                  selectedFilter === filter ? "bg-accent" : "bg-surface"
+                )}
+              >
+                <Text className="font-bold text-primary">{filter}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        {tasksForFocus.length > 0 && (
+          <FocusCard
+            isFocusMode={isFocusMode}
+            onToggleFocus={() => setIsFocusMode((v) => !v)}
+            currentTask={currentFocusTask}
+            onSkip={handleSkipFocus}
+          />
         )}
-
-        <AddTaskModal
-          visible={isModalVisible}
-          onClose={() => setModalVisible(false)}
-          onAdd={addTask}
-        />
       </View>
+
+      <FlatList
+        data={visibleTasks}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{
+          paddingHorizontal: 24,
+          paddingBottom: listBottomPadding,
+        }}
+        renderItem={({ item }) => (
+          <TaskItem
+            task={item}
+            isFocusMode={isFocusMode}
+            isCurrentFocus={currentFocusTask?.id === item.id}
+            onToggle={() => toggleTask(item.id)}
+            onDelete={() => removeTask(item.id)}
+            onFocus={() => {
+              setIsFocusMode(true);
+              setFocusTaskId(item.id);
+            }}
+          />
+        )}
+        ListEmptyComponent={
+          <View className="mt-12 items-center">
+            <Text className="font-body text-muted text-lg text-center">
+              Nenhuma tarefa aqui ainda.
+            </Text>
+            <Text className="font-body text-muted text-base text-center mt-1">
+              Toque em “Nova tarefa” para começar.
+            </Text>
+          </View>
+        }
+      />
+
+      <View
+        className="px-6"
+        style={{
+          paddingBottom: Math.max(16, insets.bottom + 12),
+        }}
+      >
+        <Button onPress={() => setIsModalVisible(true)}>Nova tarefa</Button>
+      </View>
+
+      <AddTaskModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        categories={categories}
+        onAddTask={(text, category, recurrence) =>
+          addTask(text, category, recurrence)
+        }
+      />
     </SafeAreaView>
   );
 }

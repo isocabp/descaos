@@ -1,7 +1,4 @@
-// src/components/AddTaskModal.tsx
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -12,200 +9,210 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { cn } from "../lib/utils";
-import { RecurrenceType, useTasks } from "../store/useTasks";
-import { Button } from "./Button";
+import { Button } from "@/src/components/Button";
+import { Toggle } from "@/src/components/Toggle";
+import { cn } from "@/src/lib/utils";
+import { type RecurrenceType } from "@/src/store/useTasks";
 
-interface AddTaskModalProps {
+type Props = {
   visible: boolean;
   onClose: () => void;
-  onAdd: (text: string, category: string, recurrence: RecurrenceType) => void;
-}
+  categories: string[];
+  onAddTask: (
+    text: string,
+    category: string,
+    recurrence: RecurrenceType
+  ) => void;
+};
 
-export function AddTaskModal({ visible, onClose, onAdd }: AddTaskModalProps) {
+const MAX_TEXT = 80;
+const MAX_CATEGORY = 30;
+
+export function AddTaskModal({
+  visible,
+  onClose,
+  categories,
+  onAddTask,
+}: Props) {
   const [text, setText] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Geral");
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-  const [newCategoryText, setNewCategoryText] = useState("");
-
-  // Novo estado para recorrência
+  const [category, setCategory] = useState("");
+  const [useExistingCategory, setUseExistingCategory] = useState(true);
+  const [selectedExistingCategory, setSelectedExistingCategory] =
+    useState<string>(categories[0] ?? "Geral");
   const [recurrence, setRecurrence] = useState<RecurrenceType>("none");
 
-  const { categories } = useTasks();
+  useEffect(() => {
+    if (!visible) return;
+    setSelectedExistingCategory(categories[0] ?? "Geral");
+  }, [visible, categories]);
 
-  const handleAdd = () => {
-    if (!text.trim()) return;
+  const finalCategory = useMemo(() => {
+    if (useExistingCategory) return selectedExistingCategory;
+    return category.trim();
+  }, [useExistingCategory, selectedExistingCategory, category]);
 
-    const finalCategory =
-      isCreatingCategory && newCategoryText.trim()
-        ? newCategoryText.trim()
-        : selectedCategory;
+  const isValid = useMemo(() => {
+    const trimmedText = text.trim();
+    if (!trimmedText) return false;
+    if (!finalCategory) return false;
+    return true;
+  }, [text, finalCategory]);
 
-    // Passamos a recorrência aqui
-    onAdd(text, finalCategory, recurrence);
-
-    // Resets
-    setText("");
-    setNewCategoryText("");
-    setIsCreatingCategory(false);
-    setSelectedCategory("Geral");
-    setRecurrence("none");
+  const handleClose = () => {
     onClose();
+    setText("");
+    setCategory("");
+    setUseExistingCategory(true);
+    setRecurrence("none");
   };
 
-  const RecurrenceOption = ({
-    type,
-    label,
-    icon,
-  }: {
-    type: RecurrenceType;
-    label: string;
-    icon: any;
-  }) => (
-    <Pressable
-      onPress={() => {
-        Haptics.selectionAsync();
-        setRecurrence(type);
-      }}
-      className={cn(
-        "flex-1 mr-2 p-3 rounded-xl border-2 flex-row items-center justify-center",
-        recurrence === type
-          ? "bg-primary border-primary"
-          : "bg-white border-gray-200"
-      )}
-    >
-      <Ionicons
-        name={icon}
-        size={18}
-        color={recurrence === type ? "#BDFF00" : "#111"}
-      />
-      <Text
-        className={cn(
-          "ml-2 font-bold text-xs",
-          recurrence === type ? "text-accent" : "text-primary"
-        )}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
+  const handleCreate = () => {
+    if (!isValid) return;
+    onAddTask(text.trim(), finalCategory, recurrence);
+    handleClose();
+  };
 
   return (
     <Modal
-      animationType="slide"
-      transparent={true}
       visible={visible}
-      onRequestClose={onClose}
+      animationType="slide"
+      transparent
+      onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 justify-end bg-black/50"
-      >
-        <Pressable className="flex-1" onPress={onClose} />
+      <Pressable className="flex-1 bg-black/50" onPress={handleClose} />
 
-        <View className="bg-background rounded-t-3xl border-t-2 border-primary shadow-2xl h-auto max-h-[85%]">
-          <View className="p-6 pb-2 flex-row justify-between items-center border-b border-gray-100">
-            <Text className="font-heading text-2xl text-primary">
-              Nova Tarefa
+      <KeyboardAvoidingView
+        behavior={Platform.select({ ios: "padding", android: undefined })}
+        className="absolute left-0 right-0 bottom-0"
+      >
+        <View className="bg-surface rounded-t-3xl px-6 pt-6 pb-8">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="font-heading text-3xl text-primary">
+              Nova tarefa
             </Text>
-            <Pressable onPress={onClose} className="p-2">
-              <Text className="text-primary font-bold text-lg">✕</Text>
+            <Pressable
+              onPress={handleClose}
+              accessibilityRole="button"
+              className="h-10 w-10 items-center justify-center rounded-2xl bg-background"
+            >
+              <Text className="text-primary text-lg">✕</Text>
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={{ padding: 24 }}>
+          <Text className="font-bold text-primary mb-2">Descrição</Text>
+          <View className="bg-background rounded-2xl px-4 py-3">
             <TextInput
-              autoFocus={!isCreatingCategory}
-              className="w-full p-4 border-2 border-primary rounded-xl font-body text-lg bg-white mb-6 min-h-[80px]"
-              placeholder="Ex: Tomar vitaminas..."
-              placeholderTextColor="#9CA3AF"
               value={text}
-              onChangeText={setText}
-              multiline
-              textAlignVertical="top"
+              onChangeText={(v) => setText(v.slice(0, MAX_TEXT))}
+              placeholder="Ex: Enviar relatório"
+              placeholderTextColor="#9CA3AF"
+              className="text-primary font-body text-base"
+              maxLength={MAX_TEXT}
+              returnKeyType="done"
             />
+            <Text className="text-muted text-xs mt-2 text-right">
+              {text.length}/{MAX_TEXT}
+            </Text>
+          </View>
 
-            {/* Seletor de Recorrência */}
-            <View className="mb-6">
-              <Text className="font-heading text-sm text-muted mb-3 uppercase">
-                Repetir
-              </Text>
-              <View className="flex-row">
-                <RecurrenceOption
-                  type="none"
-                  label="Nunca"
-                  icon="ban-outline"
-                />
-                <RecurrenceOption
-                  type="daily"
-                  label="Todo Dia"
-                  icon="sync-outline"
-                />
-                <RecurrenceOption
-                  type="mon-fri"
-                  label="Seg-Sex"
-                  icon="briefcase-outline"
-                />
-              </View>
+          <View className="mt-6">
+            <Text className="font-bold text-primary mb-2">Categoria</Text>
+
+            <View className="flex-row gap-3 mb-3">
+              <Pressable
+                onPress={() => setUseExistingCategory(true)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: useExistingCategory }}
+                className={cn(
+                  "flex-1 rounded-2xl px-4 py-3 items-center",
+                  useExistingCategory ? "bg-accent" : "bg-background"
+                )}
+              >
+                <Text className="font-bold text-primary">Existente</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setUseExistingCategory(false)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !useExistingCategory }}
+                className={cn(
+                  "flex-1 rounded-2xl px-4 py-3 items-center",
+                  !useExistingCategory ? "bg-accent" : "bg-background"
+                )}
+              >
+                <Text className="font-bold text-primary">Nova</Text>
+              </Pressable>
             </View>
 
-            {/* Seletor de Categoria */}
-            <View className="mb-8">
-              <Text className="font-heading text-sm text-muted mb-3 uppercase">
-                Categoria
-              </Text>
+            {useExistingCategory ? (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                className="flex-row"
+                contentContainerStyle={{ paddingRight: 24 }}
               >
-                {categories.map((cat) => (
-                  <Pressable
-                    key={cat}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setSelectedCategory(cat);
-                      setIsCreatingCategory(false);
-                    }}
-                    className={cn(
-                      "mr-3 px-4 py-2 rounded-full border-2 border-primary",
-                      !isCreatingCategory && selectedCategory === cat
-                        ? "bg-accent"
-                        : "bg-white"
-                    )}
-                  >
-                    <Text className="font-bold text-primary">{cat}</Text>
-                  </Pressable>
-                ))}
-
-                <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setIsCreatingCategory(true);
-                  }}
-                  className={cn(
-                    "mr-3 px-4 py-2 rounded-full border-2 border-dashed border-primary",
-                    isCreatingCategory ? "bg-accent" : "bg-transparent"
-                  )}
-                >
-                  <Text className="font-bold text-primary">+ Nova</Text>
-                </Pressable>
+                {categories.map((c) => {
+                  const active = c === selectedExistingCategory;
+                  return (
+                    <Pressable
+                      key={c}
+                      onPress={() => setSelectedExistingCategory(c)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      className={cn(
+                        "mr-3 rounded-full px-4 py-2",
+                        active ? "bg-accent" : "bg-background"
+                      )}
+                    >
+                      <Text className="font-bold text-primary">{c}</Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
-
-              {isCreatingCategory && (
+            ) : (
+              <View className="bg-background rounded-2xl px-4 py-3">
                 <TextInput
-                  autoFocus
-                  className="mt-4 w-full p-3 border-b-2 border-primary font-body text-base"
-                  placeholder="Nome da categoria (ex: Viagem)"
-                  value={newCategoryText}
-                  onChangeText={setNewCategoryText}
+                  value={category}
+                  onChangeText={(v) => setCategory(v.slice(0, MAX_CATEGORY))}
+                  placeholder="Ex: Trabalho"
+                  placeholderTextColor="#9CA3AF"
+                  className="text-primary font-body text-base"
+                  maxLength={MAX_CATEGORY}
+                  returnKeyType="done"
                 />
-              )}
-            </View>
+                <Text className="text-muted text-xs mt-2 text-right">
+                  {category.length}/{MAX_CATEGORY}
+                </Text>
+              </View>
+            )}
+          </View>
 
-            <Button title="Criar Tarefa" onPress={handleAdd} />
-            <View className="h-10" />
-          </ScrollView>
+          <View className="mt-6">
+            <Text className="font-bold text-primary mb-3">Recorrência</Text>
+
+            <View className="gap-3">
+              <Toggle
+                label="Sem recorrência"
+                active={recurrence === "none"}
+                onPress={() => setRecurrence("none")}
+              />
+              <Toggle
+                label="Diária"
+                active={recurrence === "daily"}
+                onPress={() => setRecurrence("daily")}
+              />
+              <Toggle
+                label="Seg–Sex"
+                active={recurrence === "mon-fri"}
+                onPress={() => setRecurrence("mon-fri")}
+              />
+            </View>
+          </View>
+
+          <View className="mt-8">
+            <Button onPress={handleCreate} disabled={!isValid}>
+              Criar tarefa
+            </Button>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>

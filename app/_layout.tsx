@@ -1,4 +1,3 @@
-// app/_layout.tsx
 import { Stack } from "expo-router";
 import { useCallback } from "react";
 import { View } from "react-native";
@@ -11,8 +10,7 @@ import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 
-// Mantém a splash screen visível até carregarmos tudo
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function Layout() {
   const [fontsLoaded] = useFonts({
@@ -23,7 +21,7 @@ export default function Layout() {
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
-      await SplashScreen.hideAsync();
+      await SplashScreen.hideAsync().catch(() => undefined);
     }
   }, [fontsLoaded]);
 
@@ -36,8 +34,8 @@ export default function Layout() {
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
-          headerShown: false, // Vamos criar nossos próprios headers minimalistas
-          contentStyle: { backgroundColor: "#F8F9FA" }, // Cor de fundo global
+          headerShown: false,
+          contentStyle: { backgroundColor: "#F8F9FA" },
         }}
       />
     </View>
