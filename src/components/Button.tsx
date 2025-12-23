@@ -1,43 +1,54 @@
-import { cn } from "@/src/lib/utils";
-import { Pressable, Text } from "react-native";
+import * as Haptics from "expo-haptics";
+import { Text, TouchableOpacity, TouchableOpacityProps } from "react-native";
+import { cn } from "../lib/utils";
 
-type Props = {
-  children: string;
-  onPress: () => void;
-  disabled?: boolean;
-  variant?: "primary" | "secondary" | "danger";
-};
+interface ButtonProps extends TouchableOpacityProps {
+  title: string;
+  variant?: "primary" | "secondary";
+}
 
 export function Button({
-  children,
-  onPress,
-  disabled,
+  title,
   variant = "primary",
-}: Props) {
-  const base = "rounded-2xl py-4 items-center justify-center active:opacity-90";
-
-  const variantClass =
-    variant === "primary"
-      ? "bg-accent"
-      : variant === "danger"
-      ? "bg-danger"
-      : "bg-surface";
-
-  const textClass = variant === "secondary" ? "text-primary" : "text-primary";
+  className,
+  onPress,
+  style,
+  ...props
+}: ButtonProps) {
+  const handlePress = (e: any) => {
+    Haptics.selectionAsync();
+    onPress?.(e);
+  };
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={handlePress}
       className={cn(
-        base,
-        variantClass,
-        disabled ? "opacity-40" : "opacity-100"
+        "w-full py-4 rounded-xl border-2 border-primary flex items-center justify-center mb-4",
+        variant === "primary" ? "bg-primary" : "bg-white",
+        className
       )}
+      style={[
+        {
+          shadowColor: "#111",
+          shadowOffset: { width: 4, height: 4 },
+          shadowOpacity: 1,
+          shadowRadius: 0,
+          elevation: 5,
+        },
+        style,
+      ]}
+      {...props}
     >
-      <Text className={cn("font-bold text-lg", textClass)}>{children}</Text>
-    </Pressable>
+      <Text
+        className={cn(
+          "font-bold text-lg font-heading",
+          variant === "primary" ? "text-accent" : "text-primary"
+        )}
+      >
+        {title}
+      </Text>
+    </TouchableOpacity>
   );
 }

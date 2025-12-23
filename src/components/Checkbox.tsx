@@ -1,37 +1,48 @@
-import { cn } from "@/src/lib/utils";
+import React from "react";
+import { Pressable, View } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
+import { cn } from "../lib/utils";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, Text, View } from "react-native";
 
-type Props = {
+interface CheckboxProps {
   checked: boolean;
   onPress: () => void;
-};
+}
 
-export function Checkbox({ checked, onPress }: Props) {
+export function Checkbox({ checked, onPress }: CheckboxProps) {
+  const scale = useSharedValue(1);
+
+  const handlePress = () => {
+    Haptics.selectionAsync();
+
+    scale.value = withSpring(0.8, {}, () => {
+      scale.value = withSpring(1);
+    });
+
+    onPress();
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-      className="flex-row items-center"
-    >
-      <View
+    <Pressable onPress={handlePress} className="active:opacity-80">
+      <Animated.View
+        style={animatedStyle}
         className={cn(
-          "h-6 w-6 rounded-lg items-center justify-center mr-3",
-          checked ? "bg-accent" : "bg-surface"
+          "w-8 h-8 border-2 border-primary rounded-lg items-center justify-center mr-4",
+          !checked && "bg-white shadow-[2px_2px_0px_0px_rgba(17,17,17,1)]",
+          checked && "bg-accent shadow-none"
         )}
       >
-        {checked && <Ionicons name="checkmark" size={16} color="#111111" />}
-      </View>
-
-      <Text
-        className={cn(
-          "font-bold text-base",
-          checked ? "text-muted" : "text-primary"
-        )}
-      >
-        {checked ? "Concluída" : "Pendente"}
-      </Text>
+        {checked && <Ionicons name="checkmark-sharp" size={20} color="#111" />}
+      </Animated.View>
     </Pressable>
   );
 }

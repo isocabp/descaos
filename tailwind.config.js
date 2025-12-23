@@ -1,4 +1,3 @@
-/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
@@ -12,7 +11,7 @@ module.exports = {
         background: "#F8F9FA",
         surface: "#FFFFFF",
         primary: "#111111",
-        accent: "#BDFF00",
+        accent: "#D1C1F2",
         danger: "#FF4D4D",
         muted: "#9CA3AF",
       },
