@@ -2,8 +2,10 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { zustandStorage } from "../lib/storage";
 import * as Haptics from "expo-haptics";
+import { cancelTaskNotification } from "../lib/notifications";
 
 export type RecurrenceType = number[];
+export type PriorityType = "high" | "medium" | "low";
 
 export interface Task {
   id: string;
@@ -11,6 +13,9 @@ export interface Task {
   category: string;
   isCompleted: boolean;
   recurrence: RecurrenceType;
+  priority: PriorityType;
+  reminderTime?: string;
+  notificationId?: string;
   lastCompletedDate?: string;
   createdAt: number;
 }
@@ -18,12 +23,14 @@ export interface Task {
 interface TasksState {
   tasks: Task[];
   categories: string[];
-  addTask: (text: string, category: string, recurrence: RecurrenceType) => void;
+  addTask: (task: Omit<Task, "id" | "isCompleted" | "createdAt">) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   toggleTask: (id: string) => void;
   removeTask: (id: string) => void;
   clearAllTasks: () => void;
   checkDailyReset: () => void;
+  setTasks: (tasks: Task[]) => void;
+  sortTasksByPriority: () => void; // <--- NOVA FUNÇÃO
 }
 
 export const useTasks = create<TasksState>()(
@@ -32,21 +39,22 @@ export const useTasks = create<TasksState>()(
       tasks: [],
       categories: [],
 
-      addTask: (text: string, category: string, recurrence: RecurrenceType) => {
+      addTask: (newTask) => {
         set((state) => {
           let newCategories = state.categories;
-          if (category.trim() !== "" && !state.categories.includes(category)) {
-            newCategories = [...state.categories, category];
+          if (
+            newTask.category.trim() !== "" &&
+            !state.categories.includes(newTask.category)
+          ) {
+            newCategories = [...state.categories, newTask.category];
           }
 
           return {
             categories: newCategories,
             tasks: [
               {
+                ...newTask,
                 id: Date.now().toString(),
-                text,
-                category,
-                recurrence,
                 isCompleted: false,
                 createdAt: Date.now(),
               },
@@ -58,6 +66,16 @@ export const useTasks = create<TasksState>()(
       },
 
       updateTask: (id, updates) => {
+        const currentTask = get().tasks.find((t) => t.id === id);
+
+        if (
+          currentTask?.notificationId &&
+          (updates.isCompleted ||
+            updates.reminderTime !== currentTask.reminderTime)
+        ) {
+          cancelTaskNotification(currentTask.notificationId);
+        }
+
         set((state) => ({
           tasks: state.tasks.map((task) =>
             task.id === id ? { ...task, ...updates } : task
@@ -67,10 +85,15 @@ export const useTasks = create<TasksState>()(
       },
 
       toggleTask: (id: string) => {
+        const task = get().tasks.find((t) => t.id === id);
+        if (task?.notificationId) {
+          cancelTaskNotification(task.notificationId);
+        }
+
         set((state) => ({
-          tasks: state.tasks.map((task) => {
-            if (task.id === id) {
-              const isNowCompleted = !task.isCompleted;
+          tasks: state.tasks.map((t) => {
+            if (t.id === id) {
+              const isNowCompleted = !t.isCompleted;
               if (isNowCompleted) {
                 Haptics.notificationAsync(
                   Haptics.NotificationFeedbackType.Success
@@ -78,30 +101,56 @@ export const useTasks = create<TasksState>()(
               } else {
                 Haptics.selectionAsync();
               }
-
               return {
-                ...task,
+                ...t,
                 isCompleted: isNowCompleted,
                 lastCompletedDate: isNowCompleted
                   ? new Date().toDateString()
                   : undefined,
               };
             }
-            return task;
+            return t;
           }),
         }));
       },
 
       removeTask: (id: string) => {
+        const task = get().tasks.find((t) => t.id === id);
+        if (task?.notificationId) cancelTaskNotification(task.notificationId);
+
         set((state) => ({
-          tasks: state.tasks.filter((task) => task.id !== id),
+          tasks: state.tasks.filter((t) => t.id !== id),
         }));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       },
 
       clearAllTasks: () => {
+        get().tasks.forEach((t) => {
+          if (t.notificationId) cancelTaskNotification(t.notificationId);
+        });
         set({ tasks: [] });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      },
+
+      setTasks: (newTasks) => {
+        set({ tasks: newTasks });
+      },
+
+      sortTasksByPriority: () => {
+        const priorityWeight = { high: 3, medium: 2, low: 1 };
+        set((state) => ({
+          tasks: [...state.tasks].sort((a, b) => {
+            // Se um está completo e o outro não, o pendente vem primeiro
+            if (a.isCompleted !== b.isCompleted) {
+              return a.isCompleted ? 1 : -1;
+            }
+            // Ordena por peso da prioridade (Maior primeiro)
+            const weightA = priorityWeight[a.priority] || 0;
+            const weightB = priorityWeight[b.priority] || 0;
+            return weightB - weightA;
+          }),
+        }));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
 
       checkDailyReset: () => {

@@ -1,25 +1,35 @@
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { useEffect, useState } from "react";
 import {
-  Keyboard,
-  KeyboardAvoidingView,
   Modal,
+  View,
+  Text,
+  TextInput,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
-  Text,
-  TextInput,
-  View,
+  Keyboard,
+  Switch,
 } from "react-native";
-import { cn } from "../lib/utils";
-import { RecurrenceType, Task, useTasks } from "../store/useTasks";
+import { useState, useEffect } from "react";
 import { Button } from "./Button";
+import { cn } from "../lib/utils";
+import {
+  useTasks,
+  RecurrenceType,
+  PriorityType,
+  Task,
+} from "../store/useTasks";
+import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import {
+  scheduleTaskNotification,
+  cancelTaskNotification,
+} from "../lib/notifications";
 
 interface AddTaskModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (text: string, category: string, recurrence: RecurrenceType) => void;
   initialTask?: Task | null;
 }
 
@@ -36,7 +46,6 @@ const DAYS_OF_WEEK = [
 export function AddTaskModal({
   visible,
   onClose,
-  onSave,
   initialTask,
 }: AddTaskModalProps) {
   const [text, setText] = useState("");
@@ -47,8 +56,12 @@ export function AddTaskModal({
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryText, setNewCategoryText] = useState("");
   const [recurrence, setRecurrence] = useState<number[]>([]);
+  const [priority, setPriority] = useState<PriorityType>("medium");
 
-  const { categories } = useTasks();
+  const [hasReminder, setHasReminder] = useState(false);
+  const [reminderDate, setReminderDate] = useState(new Date());
+
+  const { categories, addTask, updateTask } = useTasks();
 
   useEffect(() => {
     if (visible) {
@@ -56,10 +69,20 @@ export function AddTaskModal({
         setText(initialTask.text);
         setSelectedCategory(initialTask.category);
         setRecurrence(initialTask.recurrence);
+        setPriority(initialTask.priority);
+        if (initialTask.reminderTime) {
+          setHasReminder(true);
+          setReminderDate(new Date(initialTask.reminderTime));
+        } else {
+          setHasReminder(false);
+        }
       } else {
         setText("");
         setSelectedCategory("");
         setRecurrence([]);
+        setPriority("medium");
+        setHasReminder(false);
+        setReminderDate(new Date());
       }
       setCurrentScreen("main");
       setIsCreatingCategory(false);
@@ -67,7 +90,7 @@ export function AddTaskModal({
     }
   }, [visible, initialTask]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!text.trim()) return;
 
     const finalCategory =
@@ -75,7 +98,39 @@ export function AddTaskModal({
         ? newCategoryText.trim()
         : selectedCategory;
 
-    onSave(text, finalCategory, recurrence);
+    let notificationId = initialTask?.notificationId;
+
+    if (hasReminder) {
+      if (notificationId) await cancelTaskNotification(notificationId);
+
+      const now = new Date();
+      if (reminderDate < now) {
+        const tomorrow = new Date(reminderDate);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setReminderDate(tomorrow);
+      }
+
+      const id = await scheduleTaskNotification(text, reminderDate);
+      if (id) notificationId = id;
+    } else if (notificationId) {
+      await cancelTaskNotification(notificationId);
+      notificationId = undefined;
+    }
+
+    const taskData = {
+      text,
+      category: finalCategory,
+      recurrence,
+      priority,
+      reminderTime: hasReminder ? reminderDate.toISOString() : undefined,
+      notificationId,
+    };
+
+    if (initialTask) {
+      updateTask(initialTask.id, taskData);
+    } else {
+      addTask(taskData);
+    }
     onClose();
   };
 
@@ -117,7 +172,6 @@ export function AddTaskModal({
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1 justify-end bg-black/60"
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         <Pressable className="flex-1" onPress={onClose} />
 
@@ -132,15 +186,13 @@ export function AddTaskModal({
                 <Text className="text-primary font-bold ml-1">Voltar</Text>
               </Pressable>
             )}
-
             <Text className="font-heading text-xl text-primary flex-1 text-center">
               {currentScreen === "main"
                 ? initialTask
-                  ? "Editar Tarefa"
+                  ? "Editar"
                   : "Nova Tarefa"
                 : "Repetir"}
             </Text>
-
             {currentScreen === "main" && (
               <Pressable
                 onPress={onClose}
@@ -159,13 +211,85 @@ export function AddTaskModal({
             >
               <TextInput
                 autoFocus={!initialTask}
-                className="w-full text-3xl font-heading text-primary mb-8 leading-tight"
+                className="w-full text-3xl font-heading text-primary mb-6 leading-tight"
                 placeholder="O que vamos fazer?"
                 placeholderTextColor="#ccc"
                 value={text}
                 onChangeText={setText}
                 multiline
               />
+
+              <View className="mb-6">
+                <Text className="text-xs font-bold text-muted uppercase mb-2 ml-1">
+                  Prioridade
+                </Text>
+                <View className="flex-row bg-white rounded-xl border border-gray-200 p-1">
+                  {(["low", "medium", "high"] as PriorityType[]).map((p) => (
+                    <Pressable
+                      key={p}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setPriority(p);
+                      }}
+                      className={cn(
+                        "flex-1 py-2 items-center rounded-lg",
+                        priority === p
+                          ? p === "high"
+                            ? "bg-red-100"
+                            : p === "medium"
+                            ? "bg-orange-100"
+                            : "bg-blue-100"
+                          : "bg-transparent"
+                      )}
+                    >
+                      <Text
+                        className={cn(
+                          "font-bold text-xs uppercase",
+                          priority === p
+                            ? p === "high"
+                              ? "text-red-600"
+                              : p === "medium"
+                              ? "text-orange-600"
+                              : "text-blue-600"
+                            : "text-gray-400"
+                        )}
+                      >
+                        {p === "low"
+                          ? "Baixa"
+                          : p === "medium"
+                          ? "Média"
+                          : "Alta"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="font-body text-lg text-primary">
+                    Lembrete
+                  </Text>
+                  <Switch
+                    value={hasReminder}
+                    onValueChange={(v) => {
+                      Haptics.selectionAsync();
+                      setHasReminder(v);
+                    }}
+                    trackColor={{ false: "#eee", true: "#D1C1F2" }}
+                  />
+                </View>
+                {hasReminder && (
+                  <DateTimePicker
+                    value={reminderDate}
+                    mode="time"
+                    display="spinner"
+                    onChange={(e, date) => date && setReminderDate(date)}
+                    textColor="#111"
+                    style={{ height: 120 }}
+                  />
+                )}
+              </View>
 
               <Pressable
                 onPress={() => {
@@ -190,7 +314,6 @@ export function AddTaskModal({
                 <Text className="text-xs font-bold text-muted uppercase mb-3 ml-1">
                   Categoria
                 </Text>
-
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -220,7 +343,6 @@ export function AddTaskModal({
                       Geral
                     </Text>
                   </Pressable>
-
                   {categories.map((cat) => (
                     <Pressable
                       key={cat}
@@ -248,7 +370,6 @@ export function AddTaskModal({
                       </Text>
                     </Pressable>
                   ))}
-
                   <Pressable
                     onPress={() => {
                       Haptics.selectionAsync();
@@ -266,7 +387,6 @@ export function AddTaskModal({
                     </Text>
                   </Pressable>
                 </ScrollView>
-
                 {isCreatingCategory && (
                   <View className="flex-row items-center bg-white border-2 border-primary rounded-xl px-4 h-16">
                     <TextInput
@@ -306,25 +426,8 @@ export function AddTaskModal({
                     >
                       {day.label}
                     </Text>
-
                     {isSelected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={24}
-                        color="#D1C1F2"
-                        style={{
-                          textShadowColor: "black",
-                          textShadowRadius: 1,
-                        }}
-                      />
-                    )}
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={24}
-                        color="#111"
-                        style={{ position: "absolute", right: 20 }}
-                      />
+                      <Ionicons name="checkmark" size={24} color="#D1C1F2" />
                     )}
                   </Pressable>
                 );

@@ -1,13 +1,13 @@
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React from "react";
-import { Pressable, View } from "react-native";
+import { Pressable } from "react-native";
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
+  useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
 import { cn } from "../lib/utils";
-import { Ionicons } from "@expo/vector-icons";
 
 interface CheckboxProps {
   checked: boolean;
@@ -19,11 +19,9 @@ export function Checkbox({ checked, onPress }: CheckboxProps) {
 
   const handlePress = () => {
     Haptics.selectionAsync();
-
     scale.value = withSpring(0.8, {}, () => {
       scale.value = withSpring(1);
     });
-
     onPress();
   };
 
@@ -36,12 +34,14 @@ export function Checkbox({ checked, onPress }: CheckboxProps) {
       <Animated.View
         style={animatedStyle}
         className={cn(
-          "w-8 h-8 border-2 border-primary rounded-lg items-center justify-center mr-4",
-          !checked && "bg-white shadow-[2px_2px_0px_0px_rgba(17,17,17,1)]",
-          checked && "bg-accent shadow-none"
+          "w-6 h-6 border-2 border-primary rounded-lg items-center justify-center",
+          !checked && "bg-transparent border-gray-300",
+          checked && "bg-accent border-accent"
         )}
       >
-        {checked && <Ionicons name="checkmark-sharp" size={20} color="#111" />}
+        {checked && (
+          <Ionicons name="checkmark-sharp" size={16} color="#111111" />
+        )}
       </Animated.View>
     </Pressable>
   );
