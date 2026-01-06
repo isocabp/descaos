@@ -1,50 +1,74 @@
-# Welcome to your Expo app 👋
+# ⚡️ Descaos
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> **Organize seu caos mental. Uma tarefa de cada vez.**
 
-## Get started
+![Banner Descaos](https://imgur.com/a/Heqklr0)
 
-1. Install dependencies
+## 🧠 Sobre o Projeto
 
+O **Descaos** é um gerenciador de tarefas *mobile* desenvolvido com foco em neurodivergência (TDAH). Diferente de listas de tarefas comuns que geram ansiedade pelo acúmulo, o Descaos aposta no minimalismo radical e na execução sequencial.
+
+Com uma estética **Neo-Brutalista** e interações táteis satisfatórias, ele transforma a organização diária em algo tangível e menos abstrato.
+
+## ✨ Funcionalidades
+
+- **🎯 Modo Foco Imersivo:** Esconda tudo e veja apenas *uma* tarefa na tela. Ideal para evitar paralisia de escolha.
+- **🔄 Tarefas Recorrentes:** Lógica inteligente de "Reset Diário". Seus remédios e rotinas reaparecem automaticamente no dia seguinte.
+- **⚡️ Interações Gestuais:**
+  - **Swipe-to-Delete:** Deslize para excluir.
+  - **Drag & Drop:** Reorganize suas prioridades arrastando os itens.
+- **🎨 Categorias Dinâmicas:** Crie suas próprias categorias ou use as tags visuais.
+- **🔔 Notificações Inteligentes:** Lembretes precisos integrados ao sistema nativo.
+- **💾 100% Offline & Rápido:** Dados salvos localmente no dispositivo (MMKV) para carregamento instantâneo.
+
+## 📱 Screenshots
+
+> *Veja o vídeo de demonstração:* [https://imgur.com/a/rU2WTbX]
+
+## 🛠 Tech Stack
+
+Este projeto foi construído utilizando as tecnologias mais modernas do ecossistema React Native:
+
+- **Core:** [React Native](https://reactnative.dev/) com [Expo SDK 50+](https://expo.dev/)
+- **Linguagem:** TypeScript
+- **Estilização:** [NativeWind](https://www.nativewind.dev/) (Tailwind CSS para Mobile)
+- **Estado Global:** [Zustand](https://github.com/pmndrs/zustand) (Gerenciamento leve e escalável)
+- **Persistência:** [React Native MMKV](https://github.com/mrousavy/react-native-mmkv) (Storage super rápido)
+- **Animações:** [Reanimated 3](https://docs.swmansion.com/react-native-reanimated/)
+- **Gestos:** [Gesture Handler](https://docs.swmansion.com/react-native-gesture-handler/) (Swipe & Drag)
+
+## 🚀 Como Rodar Localmente
+
+Pré-requisitos: Node.js instalado e um ambiente configurado (Simulador iOS/Android ou dispositivo físico com Expo Go).
+
+1. **Clone o repositório:**
+   ```bash
+   git clone [https://github.com/isocabp/descaos.git](https://github.com/isocabp/descaos.git)
+   cd descaos
+
+2. **Instale as dependências:**
    ```bash
    npm install
-   ```
 
-2. Start the app
-
+3. **Inicie o servidor:**
    ```bash
    npx expo start
-   ```
 
-In the output, you'll find options to open the app in a
+4. **Rode no dispositivo:**
+   * Pressione "i" para abrir no Simulador iOS.
+   * Pressione "a" para abrir no Emulador Android.
+   * Ou escaneie o QR Code com o app Expo Go no seu celular.
+  
+## 🤝 Contribuição
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Contribuições são bem-vindas! Sinta-se à vontade para abrir Issues ou enviar Pull Requests.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+1. Faça um Fork do projeto
 
-## Get a fresh project
+2. Crie sua Feature Branch (git checkout -b feature/MinhaFeature)
 
-When you're ready, run:
+3. Commit suas mudanças (git commit -m 'Add: Minha nova feature')
 
-```bash
-npm run reset-project
-```
+4. Push para a Branch (git push origin feature/MinhaFeature)
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+5. Abra um Pull Request
