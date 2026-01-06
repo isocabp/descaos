@@ -2,7 +2,7 @@
 
 > **Organize seu caos mental. Uma tarefa de cada vez.**
 
-![Banner Descaos](https://imgur.com/a/Heqklr0)
+![Banner Descaos](https://i.imgur.com/SMlTHqD.jpeg)
 
 ## 🧠 Sobre o Projeto
 
